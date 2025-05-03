@@ -7,6 +7,7 @@ import time
 from datetime import timedelta
 
 from . import log
+from . import db
 from . import prehash
 from . import queryprovider
 from .query import query_ns_records
@@ -126,6 +127,39 @@ def n3map_main(argv):
     except N3MapError as e:
         log.fatal_exit(2, e)
 
+    if options['use_db']:
+        if options['db_userfile']:
+            try:
+                with open(options['db_userfile']) as f:
+                    options['db_user'] = f.readline().replace('\r', '').replace('\n', '')
+            except FileNotFoundError as e:
+                log.fatal('unable to open db userfile: \n', str(e))
+
+        if options['db_passfile']:
+            try:
+                with open(options['db_passfile']) as f:
+                    options['db_pass'] = f.readline().replace('\r', '').replace('\n', '')
+            except FileNotFoundError as e:
+                log.fatal('unable to open db userfile: \n', str(e))
+            
+        if options['db_name'] and options['db_host'] and options['db_user'] and options['db_pass'] and options['db_port']:             
+            db.database = db.Database(
+                database = options['db_name'],
+                host = options['db_host'],
+                user = options['db_user'],
+                password = options['db_pass'],
+                port = options['db_port']
+            )
+
+            db.database.connect()
+
+            if options['init_db']:
+                db.database.init()
+                db.database.close()
+                return 0
+        else:
+            log.fatal('trying to use database, but not all parameters configured')
+
     output_rrfile = None
     chain = None
     label_counter = None
@@ -137,6 +171,16 @@ def n3map_main(argv):
 
     log.info("n3map {}: starting mapping of {}".format(
         n3map.__version__, str(zone)))
+
+    if options['zone_type']:
+        scan_type = options['zone_type']
+    if options['detect_only']:
+        scan_type = 'detect_only'
+    if options['use_db']:
+        scan_id = db.create_scan(zone = str(zone),
+                scan_type = scan_type,
+                zone_type = 'unknown')
+        log.logger.scan_id = scan_id
 
     try:
         nslist = get_nameservers(zone, options['ipproto'], ns_names)
@@ -151,14 +195,35 @@ def n3map_main(argv):
             n3map.walker.check_soa(zone, qprovider)
 
         if options['dnskey_check']:
-            n3map.walker.check_dnskey(zone, qprovider)
+            if not n3map.walker.check_dnskey(zone, qprovider):
+                if options['use_db']:
+                    db.update_zone_type(id = scan_id,
+                            zone_type = 'no_dnssec')
+                log.fatal("no DNSKEY RR found at ", zone,
+                "\nZone is not DNSSEC-enabled.")
 
         if options['zone_type'] == 'auto':
             options['zone_type'] = n3map.walker.detect_dnssec_type(zone,
                     qprovider, options['detection_attempts'])
+
+            if options['use_db']:
+                db.update_zone_type(id = scan_id,
+                        zone_type = options['zone_type'])
+
+            if options['zone_type'] == 'no_dnssec':
+                log.fatal("zone doesn't seem to be DNSSEC-enabled")
+            elif options['zone_type'] == 'unknown':
+                log.fatal("failed to detect zone type, terminating.")
+
             if options['detect_only']:
                 print("{}: {}".format(str(zone), options['zone_type']))
-                return 0
+                if options['use_db']:
+                    db.finish_scan(id = scan_id, exitcode = 0)
+                return 0 
+            else:
+                if options['use_db']:
+                    db.update_zone_type(id = scan_id, 
+                            zone_type = options['zone_type'])
 
         if options['zone_type'] == 'nsec3':
             (hash_queues, process_pool) = prehash.create_prehash_pool(
@@ -247,6 +312,8 @@ def n3map_main(argv):
                                      output_file=output_rrfile)
         finished = False
         if walker is not None:
+            if options['use_db']:
+                walker.scan_id = scan_id
             starttime = time.monotonic()
             stopped_prematurely = False
             try:
@@ -274,6 +341,12 @@ def n3map_main(argv):
     finally:
         if output_rrfile is not None:
             output_rrfile.close()
+
+    if options['use_db']:
+        db.update_zone_type(id = scan_id, zone_type = options['zone_type'])
+        db.finish_scan(id = scan_id, exitcode = 0)
+        db.database.close()
+    
     return 0
 
 def default_options():
@@ -305,11 +378,20 @@ def default_options():
             'use_openssl' : True,
             'ipproto' : '',
             'detect_only' : False,
+            'use_db' : False,
+            'db_name' : 'dnsscanner',
+            'db_host' : '127.0.0.1',
+            'db_user' : None,
+            'db_pass' : None,
+            'db_userfile' : None,
+            'db_passfile' : None,
+            'db_port' : 5432,
+            'init_db' : False,
             }
     return opts
 
 def invalid_argument(opt, arg):
-    log.fatal_exit(2, "invalid " + opt + " argnument `" + str(arg) + "'")
+    log.fatal_exit(2, "invalid " + opt + " argument `" + str(arg) + "'")
 
 def parse_arguments(argv):
     long_opts = [
@@ -346,7 +428,16 @@ def parse_arguments(argv):
             'verbose',
             'color=',
             'version',
-            'detect-only'
+            'detect-only',
+            'use-database',
+            'db-name=',
+            'db-host=',
+            'db-user=',
+            'db-pass=',
+            'db-userfile=',
+            'db-passfile=',
+            'db-port=',
+            'init-db'
     ]
     options = default_options()
     opts = '346AMNabc:e:f:hi:lm:no:pqs:v'
@@ -527,8 +618,43 @@ def parse_arguments(argv):
             version()
             sys.exit(0)
 
+        elif opt in ('--use-database'):
+            options['use_db'] = True
+
+        elif opt in ('--db-name'):
+            options['db_name'] = str(arg)
+        
+        elif opt in ('--db-host'):
+            options['db_host'] = arg
+            
+        elif opt in ('--db-user'):
+            options['db_user'] = arg
+            
+        elif opt in ('--db-pass'):
+            options['db_pass'] = arg
+            
+        elif opt in ('--db-userfile'):
+            options['db_userfile'] = arg
+
+        elif opt in ('--db-passfile'):
+            options['db_passfile'] = arg
+            
+        elif opt in ('--db-port',):
+            try:
+                options['db_port'] = int(arg, 0)
+            except ValueError:
+                invalid_argument(opt, arg)
+            if options['db_port'] < 1 or options['db_port'] > 65535:
+                invalid_argument(opt, arg)
+
+        elif opt in ('--init-db'):
+            options['init_db'] = True
+
         else:
             invalid_argument(opt, "")
+
+    if options['init_db'] == True and len(args) < 1:
+        args = 'foo'
 
     if len(args) < 1:
         log.fatal_exit(2, 'missing arguments', "\n", "Try `",
@@ -567,6 +693,19 @@ Options:
                                greater effect)
       --color=WHEN           colorize output; WHEN can be 'auto' (default),
                                'always' or 'never'.
+
+Database Options (Postgres):
+      --use-database         output results to database
+      --db-name=dnsscanner   database name
+      --db-host=127.0.0.1    database host
+      --db-user=USER         database user
+      --db-pass=PASSWORD     database password
+      --db-userfile=FILE     secrets file containing database user. Takes 
+                               precedence over --db-user
+      --db-passfile=FILE     secrets file containing database password. Takes
+                               precedence over --db-pass
+      --db-port=5432         database port
+      --init-db              prepare database schema for first time use
 
 Enumeration:
   -a, --auto                 autodetect enumeration method (default)

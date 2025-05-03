@@ -1,6 +1,7 @@
 from . import log
 from . import name
 from .exception import N3MapError
+from . import db
 
 import secrets
 
@@ -24,24 +25,26 @@ def detect_dnssec_type(zone, queryprovider, attempts=5):
             return 'nsec3'
 
         if result.status() == "NXDOMAIN":
-            raise N3MapError("zone doesn't seem to be DNSSEC-enabled")
+            return 'no_dnssec'
         elif result.status() != "NOERROR":
             raise N3MapError("unexpected response status: ", result.status())
 
         # result.status() == "NOERROR":
         log.info("hit an existing owner name")
         i += 1
-    raise N3MapError("failed to detect zone type after {0:d} attempt(s), terminating.".format(attempts))
+    log.error("failed to detect zone type after {0:d} attempt(s).".format(attempts))
+    return 'unknown'
 
 def check_dnskey(zone, queryprovider):
     log.info('checking DNSKEY...')
     res, _ = queryprovider.query(zone, rrtype='DNSKEY')
     dnskey_owner = res.find_DNSKEY()
     if dnskey_owner is None:
-        raise N3MapError("no DNSKEY RR found at ", zone,
-                "\nZone is not DNSSEC-enabled.")
-    if dnskey_owner != zone:
+        return False
+    elif dnskey_owner != zone:
         raise N3MapError("invalid DNSKEY RR received. Aborting")
+    else:
+        return True
 
 def check_soa(zone, queryprovider):
     log.info('checking SOA...')
@@ -66,9 +69,34 @@ class Walker(object):
 
     def _write_chain(self, chain):
         for record in chain:
+            print(record)
             self._write_record(record)
 
     def _write_record(self, record):
+        if hasattr(db, 'database'):
+            if hasattr(db.database, 'conn'):
+                if hasattr(record, 'hashed_owner'):
+                    db.add_nsec3_record(scan_id = self.scan_id,
+                            owner = str(record.owner),
+                            hashed_owner = record.hashed_owner.hex(),
+                            ttl = record.ttl,
+                            cls = record.cls,
+                            next_hashed_owner = record.next_hashed_owner.hex(),
+                            types = record.types)
+                    if not hasattr(db.database, 'parameters_written'):
+                        db.add_nsec3_parameters(scan_id = self.scan_id,
+                                hash_algorithm = record._algorithm,
+                                flags = record.flags,
+                                iterations = record.iterations,
+                                salt = record.salt.hex())
+                elif hasattr(record, 'owner'):
+                    db.add_nsec_record(scan_id = self.scan_id,
+                            owner = str(record.owner),
+                            ttl = record.ttl,
+                            cls = record.cls,
+                            next_owner = str(record.next_owner),
+                            types = record.types)
+
         if self._output_file is not None:
             self._output_file.write_record(record)
 

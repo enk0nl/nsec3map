@@ -10,9 +10,10 @@ RUN apt-get install -y libssl3 libssl-dev \
 	python3-pip \
 	python3-dnspython \
 	python3-numpy \
-	python3-scipy
+	python3-scipy \
+	python3-psycopg2
 
-RUN pip install .[predict]
+RUN pip install .[predict] --break-system-packages
 
 WORKDIR /host
 ENTRYPOINT ["n3map"]

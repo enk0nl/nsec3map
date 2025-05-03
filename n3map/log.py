@@ -8,6 +8,8 @@ import signal
 import time
 import collections
 
+from . import db
+
 LOG_FATAL = -2
 LOG_ERROR = -1
 LOG_WARN = 0
@@ -23,18 +25,33 @@ def update():
 
 def fatal_exit(exitcode, *msg):
     logger.do_log(LOG_FATAL, os.path.basename(sys.argv[0]), ": fatal: ", *msg)
+    if hasattr(db, 'database'):
+        if hasattr(db.database, 'conn') and hasattr(logger, 'scan_id'):
+            db.add_log(scan_id = logger.scan_id, severity = 'CRITICAL', message = logger._compile_msg(msg))
+            db.finish_scan(id = logger.scan_id, exitcode = exitcode)
+            db.database.close()
+
     exit(exitcode)
 
 def fatal(*msg):
     fatal_exit(1, *msg)
 
 def warn(*msg):
+    if hasattr(db, 'database'):
+        if hasattr(db.database, 'conn') and hasattr(logger, 'scan_id'):
+            db.add_log(scan_id = logger.scan_id, severity = 'WARNING', message = logger._compile_msg(msg))
     logger.do_log(LOG_WARN, "warning: ", *msg)
 
 def error(*msg):
+    if hasattr(db, 'database'):
+        if hasattr(db.database, 'conn') and hasattr(logger, 'scan_id'):
+            db.add_log(scan_id = logger.scan_id, severity = 'ERROR', message = logger._compile_msg(msg))
     logger.do_log(LOG_ERROR, "error: ", *msg)
 
 def info(*msg):
+    if hasattr(db, 'database'):
+        if hasattr(db.database, 'conn') and hasattr(logger, 'scan_id'):
+            db.add_log(scan_id = logger.scan_id, severity = 'INFO', message = logger._compile_msg(msg))
     logger.do_log(LOG_INFO, *msg)
 
 def debug1(*msg):
