@@ -137,12 +137,16 @@ class Database(object):
                 CREATE MATERIALIZED VIEW domains_nsec3 AS SELECT DISTINCT REGEXP_REPLACE(zone, '\.$', '') AS domain FROM scans WHERE zone_type = 'nsec3';
                 CREATE INDEX idx_domains_nsec3_domain ON domains_nsec3(domain);
                 
-                CREATE MATERIALIZED VIEW domains_nsec_avoid_lies AS SELECT DISTINCT REGEXP_REPLACE(zone, '\.$', '') AS domain FROM scans WHERE zone_type = 'nsec' AND NOT id IN (
-                    SELECT DISTINCT scan_id FROM logs WHERE message LIKE '%aws%' OR message LIKE '%cloudflare%');
-                CREATE INDEX idx_domains_nsec_domain_avoid_lies ON domains_nsec_avoid_lies(domain);
-                CREATE MATERIALIZED VIEW domains_nsec3_avoid_lies AS SELECT DISTINCT REGEXP_REPLACE(zone, '\.$', '') AS domain FROM scans WHERE zone_type = 'nsec3' AND NOT id IN (
-                    SELECT DISTINCT scan_id FROM logs WHERE message LIKE '%aws%' OR message LIKE '%cloudflare%');
-                CREATE INDEX idx_domains_nsec3_domain_avoid_lies ON domains_nsec3_avoid_lies(domain);
+                CREATE MATERIALIZED VIEW domains_nsec_lies AS SELECT DISTINCT REGEXP_REPLACE(zone, '\.$', '') AS domain FROM scans WHERE zone_type = 'nsec' AND id IN (
+                    select distinct id from logs where message like '%nsone.net%' or message like '%cloudflare.com%' or message like '%awsdns%');
+                CREATE INDEX idx_domains_nsec_lies ON domains_nsec_lies(domain);
+                CREATE MATERIALIZED VIEW domains_nsec3_lies AS SELECT DISTINCT REGEXP_REPLACE(zone, '\.$', '') AS domain FROM scans WHERE zone_type = 'nsec3' AND id IN (
+                    select distinct id from logs where message like '%nsone.net%' or message like '%cloudflare.com%' or message like '%awsdns%');
+                CREATE INDEX idx_domains_nsec3_lies ON domains_nsec3_lies(domain);
+                CREATE MATERIALIZED VIEW domains_nsec_avoid_lies AS SELECT * FROM domains_nsec WHERE domain NOT IN (SELECT domain from domains_nsec_lies);
+                CREATE INDEX idx_domains_nsec_avoid_lies ON domains_nsec_avoid_lies(domain);
+                CREATE MATERIALIZED VIEW domains_nsec3_avoid_lies AS SELECT * FROM domains_nsec3 WHERE domain NOT IN (SELECT domain from domains_nsec3_lies);
+                CREATE INDEX idx_domains_nsec3_avoid_lies ON domains_nsec3_avoid_lies(domain);
 
                 CREATE VIEW stats_total_scans AS SELECT COUNT(id) from scans;
 
