@@ -138,10 +138,10 @@ class Database(object):
                 CREATE INDEX idx_domains_nsec3_domain ON domains_nsec3(domain);
                 
                 CREATE MATERIALIZED VIEW domains_nsec_lies AS SELECT DISTINCT REGEXP_REPLACE(zone, '\.$', '') AS domain FROM scans WHERE zone_type = 'nsec' AND id IN (
-                    select distinct id from logs where message like '%nsone.net%' or message like '%cloudflare.com%' or message like '%awsdns%');
+                    SELECT DISTINCT scan_id FROM logs WHERE message LIKE '%nsone.net%' OR message LIKE '%cloudflare.com%' OR message LIKE '%awsdns%');
                 CREATE INDEX idx_domains_nsec_lies ON domains_nsec_lies(domain);
                 CREATE MATERIALIZED VIEW domains_nsec3_lies AS SELECT DISTINCT REGEXP_REPLACE(zone, '\.$', '') AS domain FROM scans WHERE zone_type = 'nsec3' AND id IN (
-                    select distinct id from logs where message like '%nsone.net%' or message like '%cloudflare.com%' or message like '%awsdns%');
+                    SELECT DISTINCT scan_id FROM logs WHERE message LIKE '%nsone.net%' OR message LIKE '%cloudflare.com%' OR message LIKE '%awsdns%');
                 CREATE INDEX idx_domains_nsec3_lies ON domains_nsec3_lies(domain);
                 CREATE MATERIALIZED VIEW domains_nsec_avoid_lies AS SELECT * FROM domains_nsec WHERE domain NOT IN (SELECT domain from domains_nsec_lies);
                 CREATE INDEX idx_domains_nsec_avoid_lies ON domains_nsec_avoid_lies(domain);
