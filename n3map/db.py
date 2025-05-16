@@ -125,6 +125,67 @@ class Database(object):
                     message TEXT,
                     severity VARCHAR(20) CHECK (severity IN ('INFO', 'WARNING', 'ERROR', 'CRITICAL'))
                 );
+
+                CREATE MATERIALIZED VIEW domains_all AS SELECT DISTINCT REGEXP_REPLACE(zone, '\.$', '') AS domain FROM scans;
+                CREATE INDEX idx_domains_all_domain ON domains_all(domain);
+                CREATE MATERIALIZED VIEW domains_unknown AS SELECT DISTINCT REGEXP_REPLACE(zone, '\.$', '') AS domain FROM scans WHERE zone_type = 'unknown';
+                CREATE INDEX idx_domains_unknown_domain ON domains_unknown(domain);
+                CREATE MATERIALIZED VIEW domains_no_dnssec AS SELECT DISTINCT REGEXP_REPLACE(zone, '\.$', '') AS domain FROM scans WHERE zone_type = 'no_dnssec';
+                CREATE INDEX idx_domains_no_dnssec_domain ON domains_no_dnssec(domain);
+                CREATE MATERIALIZED VIEW domains_nsec AS SELECT DISTINCT REGEXP_REPLACE(zone, '\.$', '') AS domain FROM scans WHERE zone_type = 'nsec';
+                CREATE INDEX idx_domains_nsec_domain ON domains_nsec(domain);
+                CREATE MATERIALIZED VIEW domains_nsec3 AS SELECT DISTINCT REGEXP_REPLACE(zone, '\.$', '') AS domain FROM scans WHERE zone_type = 'nsec3';
+                CREATE INDEX idx_domains_nsec3_domain ON domains_nsec3(domain);
+
+                CREATE VIEW stats_total_scans AS SELECT COUNT(id) from scans;
+
+                CREATE VIEW stats_total_scans_by_zone_type AS SELECT zone_type,COUNT(id) FROM scans 
+                    GROUP BY zone_type 
+                    ORDER BY
+                        CASE zone_type
+                            WHEN 'nsec3' THEN 1
+                            WHEN 'nsec' THEN 2
+                            WHEN 'no_dnssec' THEN 3
+                            WHEN 'unknown' THEN 4
+                            ELSE 5
+                        END;
+
+                CREATE VIEW stats_total_domains AS SELECT COUNT(DISTINCT zone) FROM scans;
+                
+                CREATE VIEW stats_domains_by_zone_type AS
+                    WITH ranked_domains AS (
+                        SELECT
+                            zone,
+                            zone_type,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY zone
+                                ORDER BY 
+                                    CASE zone_type
+                                        WHEN 'nsec3' THEN 1
+                                        WHEN 'nsec' THEN 2
+                                        WHEN 'no_dnssec' THEN 3
+                                        WHEN 'unknown' THEN 4
+                                        ELSE 5
+                                    END
+                            ) AS rn
+                        FROM scans
+                    ),
+                    highest_precedence AS (
+                        SELECT zone, zone_type
+                        FROM ranked_domains
+                        WHERE rn = 1
+                    )
+                    SELECT zone_type, COUNT(*)
+                    FROM highest_precedence
+                    GROUP BY zone_type
+                    ORDER BY
+                        CASE zone_type
+                            WHEN 'nsec3' THEN 1
+                            WHEN 'nsec' THEN 2
+                            WHEN 'no_dnssec' THEN 3
+                            WHEN 'unknown' THEN 4
+                            ELSE 5
+                        END;
             ''')
             self.conn.commit()
             return
