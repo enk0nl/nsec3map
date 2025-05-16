@@ -136,6 +136,13 @@ class Database(object):
                 CREATE INDEX idx_domains_nsec_domain ON domains_nsec(domain);
                 CREATE MATERIALIZED VIEW domains_nsec3 AS SELECT DISTINCT REGEXP_REPLACE(zone, '\.$', '') AS domain FROM scans WHERE zone_type = 'nsec3';
                 CREATE INDEX idx_domains_nsec3_domain ON domains_nsec3(domain);
+                
+                CREATE MATERIALIZED VIEW domains_nsec_avoid_lies AS SELECT DISTINCT REGEXP_REPLACE(zone, '\.$', '') AS domain FROM scans WHERE zone_type = 'nsec' AND NOT id IN (
+                    SELECT DISTINCT scan_id FROM logs WHERE message LIKE '%aws%' OR message LIKE '%cloudflare%');
+                CREATE INDEX idx_domains_nsec_domain_avoid_lies ON domains_nsec_avoid_lies(domain);
+                CREATE MATERIALIZED VIEW domains_nsec3_avoid_lies AS SELECT DISTINCT REGEXP_REPLACE(zone, '\.$', '') AS domain FROM scans WHERE zone_type = 'nsec3' AND NOT id IN (
+                    SELECT DISTINCT scan_id FROM logs WHERE message LIKE '%aws%' OR message LIKE '%cloudflare%');
+                CREATE INDEX idx_domains_nsec3_domain_avoid_lies ON domains_nsec3_avoid_lies(domain);
 
                 CREATE VIEW stats_total_scans AS SELECT COUNT(id) from scans;
 
