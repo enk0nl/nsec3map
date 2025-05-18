@@ -240,7 +240,9 @@ class NSECWalker(walker.Walker):
                 covering_nsec.next_owner != self.zone):
             raise NSECWalkError('NSEC owner > next_owner, ',
                     'but next_owner != zone')
-
+        elif str(covering_nsec.owner).startswith('\\x00.') and str(covering_nsec.next_owner).startswith('\\x00.\\x00.'):
+            raise NSECWalkError('Zone likely implements black lies, aborting')
+        
         for i in self.nsec_chain:
             if covering_nsec.owner == i.owner and covering_nsec.next_owner == i.next_owner and covering_nsec.types == i.types:
                 raise NSECWalkError('Record already exists in the chain, aborting to avoid a loop')
@@ -444,7 +446,6 @@ class NSECWalkerA(NSECWalker):
             if covering_nsec is None:
                 # only happens when self._finished(dname) == True
                 break
-
             self._append_covering_record(covering_nsec)
             log.debug2("next in chain: ", str(covering_nsec.next_owner))
             dname = covering_nsec.next_owner
