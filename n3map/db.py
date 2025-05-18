@@ -149,6 +149,10 @@ class Database(object):
                 CREATE INDEX idx_domains_nsec3_avoid_lies ON domains_nsec3_avoid_lies(domain);
 
                 CREATE VIEW stats_total_scans AS SELECT COUNT(id) from scans;
+                CREATE VIEW stats_total_nsec_scans AS SELECT COUNT(*) FROM scans WHERE scan_type = 'nsec';
+                CREATE VIEW stats_nsec_zones_walked AS SELECT COUNT(DISTINCT zone) FROM scans WHERE scan_type = 'nsec' OR (scan_type = 'auto' AND 'zone_type' = 'nsec');
+                CREATE VIEW stats_nsec3_zones_walked AS SELECT COUNT(DISTINCT zone) FROM scans WHERE scan_type = 'nsec3' OR (scan_type = 'auto' AND 'zone_type' = 'nsec3');
+                CREATE VIEW stats_total_zones_walked AS SELECT COUNT(DISTINCT zone) FROM scans WHERE scan_type = 'nsec' OR scan_type = 'nsec3' OR (scan_type = 'auto' AND ('zone_type' = 'nsec3' OR 'zone_type' = 'nsec'));
 
                 CREATE VIEW stats_total_scans_by_zone_type AS SELECT zone_type,COUNT(id) FROM scans 
                     GROUP BY zone_type 
@@ -197,6 +201,75 @@ class Database(object):
                             WHEN 'unknown' THEN 4
                             ELSE 5
                         END;
+                
+                CREATE MATERIALIZED VIEW subdomains_all_by_owner AS SELECT 
+                    d.owner,
+                    subs[i] AS subdomain
+                FROM (
+                    SELECT DISTINCT owner
+                    FROM nsec_resource_records
+                ) d
+                CROSS JOIN LATERAL (
+                    SELECT string_to_array(d.owner, '.') AS full_parts
+                ) p
+                CROSS JOIN LATERAL (
+                    SELECT p.full_parts[1:array_length(p.full_parts, 1) - 3] AS subs
+                ) sliced
+                CROSS JOIN LATERAL generate_subscripts(sliced.subs, 1) AS gs(i);
+
+                CREATE MATERIALIZED VIEW subdomains_a_aaaa_by_owner AS SELECT 
+                    d.owner,
+                    subs[i] AS subdomain
+                FROM (
+                    SELECT DISTINCT owner
+                    FROM nsec_resource_records
+                    WHERE (
+                        types LIKE '{A%' 
+                        OR types LIKE '%,A%' 
+                        OR types LIKE '{AAAA%' 
+                        OR types LIKE '%,AAAA%'
+                    )
+                ) d
+                CROSS JOIN LATERAL (
+                    SELECT string_to_array(d.owner, '.') AS full_parts
+                ) p
+                CROSS JOIN LATERAL (
+                    SELECT p.full_parts[1:array_length(p.full_parts, 1) - 3] AS subs
+                ) sliced
+                CROSS JOIN LATERAL generate_subscripts(sliced.subs, 1) AS gs(i);
+
+                CREATE VIEW subdomains_all_by_occurrance AS
+                SELECT 
+                    subdomain,
+                    COUNT(*)
+                FROM subdomains_all_by_owner
+                GROUP BY subdomain
+                ORDER BY count DESC, subdomain;
+
+                CREATE VIEW subdomains_a_aaaa_by_occurrance AS
+                SELECT 
+                    subdomain,
+                    COUNT(*)
+                FROM subdomains_a_aaaa_by_owner
+                GROUP BY subdomain
+                ORDER BY count DESC, subdomain;
+                
+                CREATE VIEW stats_total_owners AS SELECT COUNT(DISTINCT OWNER) FROM nsec_resource_records;
+                CREATE VIEW stats_total_subdomains AS SELECT COUNT(*) FROM subdomains_all_by_occurrance;
+                
+                CREATE MATERIALIZED VIEW nameservers_black_lies AS
+                SELECT DISTINCT
+                    TRIM(
+                        TRAILING '.' FROM
+                        SUBSTRING(message FROM '\(([^\s)]+(?:\.[^\s)]+)+)')
+                    ) AS nameserver
+                FROM logs
+                WHERE message LIKE '%nameserver:%'
+                    AND scan_id IN (
+                        SELECT DISTINCT scan_id
+                        FROM logs
+                        WHERE message LIKE '%black lies%'
+                    );
             ''')
             self.conn.commit()
             return
