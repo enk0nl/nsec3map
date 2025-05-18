@@ -241,7 +241,12 @@ class NSECWalker(walker.Walker):
             raise NSECWalkError('NSEC owner > next_owner, ',
                     'but next_owner != zone')
 
+        for i in self.nsec_chain:
+            if covering_nsec.owner == i.owner and covering_nsec.next_owner == i.next_owner and covering_nsec.types == i.types:
+                raise NSECWalkError('Record already exists in the chain, aborting to avoid a loop')
+        
         self.nsec_chain.append(covering_nsec)
+
         log.debug1('discovered owner: ', str(covering_nsec.owner),
                 "\t", ' '.join(covering_nsec.types))
         log.update()
@@ -336,8 +341,6 @@ class NSECWalkerN(NSECWalker):
             # status == OK:
             self._append_covering_record(covering_nsec)
             log.debug2("next in chain: ", str(covering_nsec.next_owner))
-            if str(covering_nsec.next_owner).startswith('*'):
-                raise NSECWalkError('next owner appears to be a wildcard address')
             dname = covering_nsec.next_owner
 
         return self.nsec_chain
@@ -444,8 +447,6 @@ class NSECWalkerA(NSECWalker):
 
             self._append_covering_record(covering_nsec)
             log.debug2("next in chain: ", str(covering_nsec.next_owner))
-            if str(covering_nsec.next_owner).startswith('*'):
-                raise NSECWalkError('next owner appears to be a wildcard address')
             dname = covering_nsec.next_owner
 
         return self.nsec_chain
@@ -515,8 +516,6 @@ class NSECWalkerMixed(NSECWalkerA):
 
             self._append_covering_record(covering_nsec)
             log.debug2("next in chain: ", str(covering_nsec.next_owner))
-            if str(covering_nsec.next_owner).startswith('*'):
-                raise NSECWalkError('next owner appears to be a wildcard address')
             dname = covering_nsec.next_owner
 
         return self.nsec_chain
