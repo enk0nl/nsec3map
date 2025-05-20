@@ -126,21 +126,21 @@ class Database(object):
                     severity VARCHAR(20) CHECK (severity IN ('INFO', 'WARNING', 'ERROR', 'CRITICAL'))
                 );
 
-                CREATE MATERIALIZED VIEW domains_all AS SELECT DISTINCT REGEXP_REPLACE(zone, '\.$', '') AS domain FROM scans;
+                CREATE MATERIALIZED VIEW domains_all AS SELECT DISTINCT REGEXP_REPLACE(zone, '\\.$', '') AS domain FROM scans;
                 CREATE INDEX idx_domains_all_domain ON domains_all(domain);
-                CREATE MATERIALIZED VIEW domains_unknown AS SELECT DISTINCT REGEXP_REPLACE(zone, '\.$', '') AS domain FROM scans WHERE zone_type = 'unknown';
+                CREATE MATERIALIZED VIEW domains_unknown AS SELECT DISTINCT REGEXP_REPLACE(zone, '\\.$', '') AS domain FROM scans WHERE zone_type = 'unknown';
                 CREATE INDEX idx_domains_unknown_domain ON domains_unknown(domain);
-                CREATE MATERIALIZED VIEW domains_no_dnssec AS SELECT DISTINCT REGEXP_REPLACE(zone, '\.$', '') AS domain FROM scans WHERE zone_type = 'no_dnssec';
+                CREATE MATERIALIZED VIEW domains_no_dnssec AS SELECT DISTINCT REGEXP_REPLACE(zone, '\\.$', '') AS domain FROM scans WHERE zone_type = 'no_dnssec';
                 CREATE INDEX idx_domains_no_dnssec_domain ON domains_no_dnssec(domain);
-                CREATE MATERIALIZED VIEW domains_nsec AS SELECT DISTINCT REGEXP_REPLACE(zone, '\.$', '') AS domain FROM scans WHERE zone_type = 'nsec';
+                CREATE MATERIALIZED VIEW domains_nsec AS SELECT DISTINCT REGEXP_REPLACE(zone, '\\.$', '') AS domain FROM scans WHERE zone_type = 'nsec';
                 CREATE INDEX idx_domains_nsec_domain ON domains_nsec(domain);
-                CREATE MATERIALIZED VIEW domains_nsec3 AS SELECT DISTINCT REGEXP_REPLACE(zone, '\.$', '') AS domain FROM scans WHERE zone_type = 'nsec3';
+                CREATE MATERIALIZED VIEW domains_nsec3 AS SELECT DISTINCT REGEXP_REPLACE(zone, '\\.$', '') AS domain FROM scans WHERE zone_type = 'nsec3';
                 CREATE INDEX idx_domains_nsec3_domain ON domains_nsec3(domain);
                 
-                CREATE MATERIALIZED VIEW domains_nsec_lies AS SELECT DISTINCT REGEXP_REPLACE(zone, '\.$', '') AS domain FROM scans WHERE zone_type = 'nsec' AND id IN (
+                CREATE MATERIALIZED VIEW domains_nsec_lies AS SELECT DISTINCT REGEXP_REPLACE(zone, '\\.$', '') AS domain FROM scans WHERE zone_type = 'nsec' AND id IN (
                     SELECT DISTINCT scan_id FROM logs WHERE message LIKE '%nsone.net%' OR message LIKE '%cloudflare.com%' OR message LIKE '%awsdns%');
                 CREATE INDEX idx_domains_nsec_lies ON domains_nsec_lies(domain);
-                CREATE MATERIALIZED VIEW domains_nsec3_lies AS SELECT DISTINCT REGEXP_REPLACE(zone, '\.$', '') AS domain FROM scans WHERE zone_type = 'nsec3' AND id IN (
+                CREATE MATERIALIZED VIEW domains_nsec3_lies AS SELECT DISTINCT REGEXP_REPLACE(zone, '\\.$', '') AS domain FROM scans WHERE zone_type = 'nsec3' AND id IN (
                     SELECT DISTINCT scan_id FROM logs WHERE message LIKE '%nsone.net%' OR message LIKE '%cloudflare.com%' OR message LIKE '%awsdns%');
                 CREATE INDEX idx_domains_nsec3_lies ON domains_nsec3_lies(domain);
                 CREATE MATERIALIZED VIEW domains_nsec_avoid_lies AS SELECT * FROM domains_nsec WHERE domain NOT IN (SELECT domain from domains_nsec_lies);
@@ -154,8 +154,8 @@ class Database(object):
                 CREATE VIEW stats_nsec3_zones_walked AS SELECT COUNT(DISTINCT zone) FROM scans WHERE scan_type = 'nsec3' OR (scan_type = 'auto' AND 'zone_type' = 'nsec3');
                 CREATE VIEW stats_total_zones_walked AS SELECT COUNT(DISTINCT zone) FROM scans WHERE scan_type = 'nsec' OR scan_type = 'nsec3' OR (scan_type = 'auto' AND ('zone_type' = 'nsec3' OR 'zone_type' = 'nsec'));
 
-                CREATE VIEW stats_total_scans_by_zone_type AS SELECT zone_type,COUNT(id) FROM scans 
-                    GROUP BY zone_type 
+                CREATE VIEW stats_total_scans_by_zone_type AS SELECT zone_type,COUNT(id) FROM scans
+                    GROUP BY zone_type
                     ORDER BY
                         CASE zone_type
                             WHEN 'nsec3' THEN 1
@@ -174,7 +174,7 @@ class Database(object):
                             zone_type,
                             ROW_NUMBER() OVER (
                                 PARTITION BY zone
-                                ORDER BY 
+                                ORDER BY
                                     CASE zone_type
                                         WHEN 'nsec3' THEN 1
                                         WHEN 'nsec' THEN 2
@@ -202,7 +202,7 @@ class Database(object):
                             ELSE 5
                         END;
                 
-                CREATE MATERIALIZED VIEW subdomains_all_by_owner AS SELECT 
+                CREATE MATERIALIZED VIEW subdomains_all_by_owner AS SELECT
                     d.owner,
                     subs[i] AS subdomain
                 FROM (
@@ -224,9 +224,9 @@ class Database(object):
                     SELECT DISTINCT owner
                     FROM nsec_resource_records
                     WHERE (
-                        types LIKE '{A%' 
-                        OR types LIKE '%,A%' 
-                        OR types LIKE '{AAAA%' 
+                        types LIKE '{A%'
+                        OR types LIKE '%,A%'
+                        OR types LIKE '{AAAA%'
                         OR types LIKE '%,AAAA%'
                     )
                 ) d
@@ -239,7 +239,7 @@ class Database(object):
                 CROSS JOIN LATERAL generate_subscripts(sliced.subs, 1) AS gs(i);
 
                 CREATE VIEW subdomains_all_by_occurrance AS
-                SELECT 
+                SELECT
                     subdomain,
                     COUNT(*)
                 FROM subdomains_all_by_owner
@@ -247,7 +247,7 @@ class Database(object):
                 ORDER BY count DESC, subdomain;
 
                 CREATE VIEW subdomains_a_aaaa_by_occurrance AS
-                SELECT 
+                SELECT
                     subdomain,
                     COUNT(*)
                 FROM subdomains_a_aaaa_by_owner
@@ -261,7 +261,7 @@ class Database(object):
                 SELECT DISTINCT
                     TRIM(
                         TRAILING '.' FROM
-                        SUBSTRING(message FROM '\(([^\s)]+(?:\.[^\s)]+)+)')
+                        SUBSTRING(message FROM '\\(([^\\s)]+(?:\\.[^\\s)]+)+)')
                     ) AS nameserver
                 FROM logs
                 WHERE message LIKE '%nameserver:%'
@@ -275,4 +275,4 @@ class Database(object):
             return
         except psycopg2.errors.DuplicateTable as e:
             log.fatal('unable to initialize database: ', str(e))
-    
+
