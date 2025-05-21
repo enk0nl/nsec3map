@@ -163,6 +163,7 @@ class NSECResult:
                     log.warn("walked into a sub-zone at ", str(self.query_dn),
                              " (RRSIG signer does not match zone)")
                     return (ResultStatus.SUBZONE, None, signer)
+
                 # part of this zone
 
                 # check for NSEC records anyway. This can happen e.g. if the
@@ -240,7 +241,7 @@ class NSECWalker(walker.Walker):
                 covering_nsec.next_owner != self.zone):
             raise NSECWalkError('NSEC owner > next_owner, ',
                     'but next_owner != zone')
-        elif str(covering_nsec.owner).startswith('\\x00.') and str(covering_nsec.next_owner).startswith('\\x00.\\x00.'):
+        elif str(covering_nsec.owner).startswith('\\x00.') and str(covering_nsec.next_owner).startswith('\\x00\\x00.'):
             raise NSECWalkError('Zone likely implements black lies, aborting')
         
         for i in self.nsec_chain:
@@ -372,6 +373,9 @@ class NSECWalkerA(NSECWalker):
 
 
     def _skip_subzone(self, dname, query_dn, subzone):
+        if '\\x00\\x00' in (str(query_dn)):
+            raise NSECWalkError('Got into a loop while trying to skip subzone, aborting')
+
         if dname == self.zone:
             log.warn("trying to skip sub-zone ", str(query_dn))
             return self._increase_dn_next_step(query_dn)
