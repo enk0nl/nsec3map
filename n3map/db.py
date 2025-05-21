@@ -125,6 +125,11 @@ class Database(object):
                     message TEXT,
                     severity VARCHAR(20) CHECK (severity IN ('INFO', 'WARNING', 'ERROR', 'CRITICAL'))
                 );
+                                
+                CREATE INDEX idx_nsec_resource_records_scan_id ON nsec_resource_records (scan_id);
+                CREATE INDEX idx_nsec3_resource_records_scan_id ON nsec3_resource_records (scan_id);
+                CREATE INDEX idx_nsec3_parameters_scan_id ON nsec3_parameters (scan_id);
+                CREATE INDEX idx_logs_scan_id ON logs (scan_id);
 
                 CREATE MATERIALIZED VIEW domains_all AS SELECT DISTINCT REGEXP_REPLACE(zone, '\\.$', '') AS domain FROM scans;
                 CREATE INDEX idx_domains_all_domain ON domains_all(domain);
