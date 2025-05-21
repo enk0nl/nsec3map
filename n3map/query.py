@@ -160,6 +160,8 @@ def query(dname, ns, rrtype, timeout):
         return exception.TimeOutError()
     except dns.query.BadResponse:
         return exception.QueryError()
+    except dns.name.BadLabelType:
+        raise exception.N3MapError('Unable to resolve ' + str(dname), ' bad DNS name')
     if res.status() != 'NOERROR' and res.status() != 'NXDOMAIN':
         return exception.UnexpectedResponseStatus(res.status())
     return res

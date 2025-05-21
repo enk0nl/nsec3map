@@ -60,6 +60,11 @@ class NSEC3Walker(walker.Walker):
         recv_nsec3 = res.find_NSEC3()
         if len(recv_nsec3) == 0:
             if res.status() == "NOERROR":
+                # Tarpit detection
+                for record in res._result.sections[2]:
+                    if 'IN NSEC \\000' in record.to_text():
+                        log.error("Tarpit detected by Cloudflare: https://blog.cloudflare.com/black-lies/")
+                        exit()
                 log.info("hit an existing owner name: ", str(query_dn))
                 ns.reset_errors()
                 return
