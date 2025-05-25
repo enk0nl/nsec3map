@@ -241,7 +241,7 @@ class NSECWalker(walker.Walker):
                 covering_nsec.next_owner != self.zone):
             raise NSECWalkError('NSEC owner > next_owner, ',
                     'but next_owner != zone')
-        elif str(covering_nsec.owner).startswith('\\x00.') and str(covering_nsec.next_owner).startswith('\\x00\\x00.'):
+        elif str(covering_nsec.owner).startswith('\\x00.') and (str(covering_nsec.next_owner).startswith('\\x00\\x00.') or str(covering_nsec.next_owner).startswith('\\x00.\\x00.')):
             raise NSECWalkError('Zone likely implements black lies, aborting')
         
         for i in self.nsec_chain:
