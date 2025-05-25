@@ -63,8 +63,9 @@ class NSEC3Walker(walker.Walker):
                 # Tarpit detection
                 for record in res._result.sections[2]:
                     if 'IN NSEC \\000' in record.to_text():
-                        log.error("Tarpit detected by Cloudflare: https://blog.cloudflare.com/black-lies/")
-                        exit()
+                        log.fatal("Tarpit detected by Cloudflare: https://blog.cloudflare.com/black-lies/")
+                if self.stats['queries'] == 25 and self.stats['tested_hashes'] == 0:
+                        log.fatal('Did not receive any NSEC3 records after 25 queries, zone is probably not NSEC3 enabled or there is some zone walking mitigation in place')
                 log.info("hit an existing owner name: ", str(query_dn))
                 ns.reset_errors()
                 return
