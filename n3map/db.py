@@ -222,6 +222,15 @@ class Database(object):
                 ) sliced
                 CROSS JOIN LATERAL generate_subscripts(sliced.subs, 1) AS gs(i);
 
+                CREATE MATERIALIZED VIEW subdomains_leftmost_all_by_owner AS
+                SELECT DISTINCT
+                    n.owner,
+                    parts[1] AS subdomain
+                FROM nsec_resource_records n,
+                LATERAL string_to_array(n.owner, '.') AS parts
+                WHERE array_length(parts, 1) >= 4
+                AND n.owner IS NOT NULL;
+
                 CREATE MATERIALIZED VIEW subdomains_a_aaaa_by_owner AS SELECT 
                     d.owner,
                     subs[i] AS subdomain
@@ -242,6 +251,21 @@ class Database(object):
                     SELECT p.full_parts[1:array_length(p.full_parts, 1) - 3] AS subs
                 ) sliced
                 CROSS JOIN LATERAL generate_subscripts(sliced.subs, 1) AS gs(i);
+                                
+                CREATE MATERIALIZED VIEW subdomains_leftmost_a_aaaa_by_owner AS
+                SELECT DISTINCT
+                    n.owner,
+                    parts[1] AS subdomain
+                FROM nsec_resource_records n,
+                LATERAL string_to_array(n.owner, '.') AS parts
+                WHERE (
+                    n.types LIKE '{A%'
+                    OR n.types LIKE '%,A%'
+                    OR n.types LIKE '{AAAA%'
+                    OR n.types LIKE '%,AAAA%'
+                )
+                AND array_length(parts, 1) >= 4
+                AND n.owner IS NOT NULL;
 
                 CREATE VIEW subdomains_all_by_occurrance AS
                 SELECT
@@ -251,11 +275,27 @@ class Database(object):
                 GROUP BY subdomain
                 ORDER BY count DESC, subdomain;
 
+                CREATE VIEW subdomains_leftmost_all_by_occurrance AS
+                SELECT
+                    subdomain,
+                    COUNT(*)
+                FROM subdomains_leftmost_all_by_owner
+                GROUP BY subdomain
+                ORDER BY count DESC, subdomain;
+
                 CREATE VIEW subdomains_a_aaaa_by_occurrance AS
                 SELECT
                     subdomain,
                     COUNT(*)
                 FROM subdomains_a_aaaa_by_owner
+                GROUP BY subdomain
+                ORDER BY count DESC, subdomain;
+                                
+                CREATE VIEW subdomains_leftmost_a_aaaa_by_occurrance AS
+                SELECT
+                    subdomain,
+                    COUNT(*)
+                FROM subdomains_leftmost_a_aaaa_by_owner
                 GROUP BY subdomain
                 ORDER BY count DESC, subdomain;
                 
