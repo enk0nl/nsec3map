@@ -10,6 +10,7 @@ from ..exception import (
         InvalidDomainNameError,
         ParseError
     )
+from base64 import binascii
 
 SHA1 = 1
 SHA1_LENGTH = 20
@@ -54,7 +55,7 @@ class NSEC3(rr.RR):
                 raise NSEC3Error('NSEC3 RR: invalid hashed_owner length')
             self.hashed_owner = hashed_owner
             self.zone = zone
-        except (InvalidDomainNameError, TypeError, IndexError):
+        except (InvalidDomainNameError, TypeError, IndexError, binascii.Error):
             raise NSEC3Error("NSEC3 RR: could not decode hashed owner name")
 
     @property
