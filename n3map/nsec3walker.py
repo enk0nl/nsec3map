@@ -97,7 +97,7 @@ class NSEC3Walker(walker.Walker):
             # check if the record is minimally-covering
             #  ref 'NSEC3 White Lies':
             #  https://tools.ietf.org/html/rfc7129#appendix-B
-            if rr.distance_covered() == 2:
+            if rr.distance_covered() <= 2:
                 raise NSEC3WalkError('Received minimally-covering NSEC3 record\n',
                              'This zone likely uses "NSEC3 White Lies" to prevent zone enumeration\n',
                              '(See https://tools.ietf.org/html/rfc7129#appendix-B)')
