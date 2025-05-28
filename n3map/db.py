@@ -159,6 +159,11 @@ class Database(object):
                 CREATE VIEW stats_nsec3_zones_walked AS SELECT COUNT(DISTINCT zone) FROM scans WHERE scan_type = 'nsec3' OR (scan_type = 'auto' AND 'zone_type' = 'nsec3');
                 CREATE VIEW stats_total_zones_walked AS SELECT COUNT(DISTINCT zone) FROM scans WHERE scan_type = 'nsec' OR scan_type = 'nsec3' OR (scan_type = 'auto' AND ('zone_type' = 'nsec3' OR 'zone_type' = 'nsec'));
 
+                CREATE VIEW stats_nsec_zones_largest AS SELECT scans.id AS scan_id,start_time,zone,COUNT(*) FROM scans INNER JOIN nsec_resource_records ON scans.id = nsec_resource_records.scan_id WHERE scan_type = 'nsec' OR (scan_type = 'auto' AND zone_type = 'nsec') GROUP BY zone,scans.id,start_time ORDER BY count DESC LIMIT 50;
+                CREATE VIEW stats_nsec3_zones_largest AS SELECT scans.id AS scan_id,start_time,zone,COUNT(*) FROM scans INNER JOIN nsec3_resource_records ON scans.id = nsec3_resource_records.scan_id WHERE scan_type = 'nsec3' OR (scan_type = 'auto' AND zone_type = 'nsec3')  GROUP BY zone,scans.id,start_time ORDER BY count DESC LIMIT 50;
+                CREATE VIEW stats_nsec_zones_most_logs AS SELECT scans.id AS scan_id,start_time,zone,COUNT(*) FROM scans INNER JOIN logs ON scans.id = logs.scan_id WHERE scan_type = 'nsec'  OR (scan_type = 'auto' AND zone_type = 'nsec') GROUP BY zone,scans.id,start_time ORDER BY count DESC LIMIT 50;
+                CREATE VIEW stats_nsec3_zones_most_logs AS SELECT scans.id AS scan_id,start_time,zone,COUNT(*) FROM scans INNER JOIN logs ON scans.id = logs.scan_id WHERE scan_type = 'nsec3'  OR (scan_type = 'auto' AND zone_type = 'nsec3') GROUP BY zone,scans.id,start_time ORDER BY count DESC LIMIT 50;
+
                 CREATE VIEW stats_total_scans_by_zone_type AS SELECT zone_type,COUNT(id) FROM scans
                     GROUP BY zone_type
                     ORDER BY
