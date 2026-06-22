@@ -97,7 +97,7 @@ class RRFileStream(object):
     def nsec3_reader(self):
         log.info("reading NSEC3 RRs from ", str(self.f.name))
         self.seek(0)
-        p_counter = re.compile("^;;;; label_counter\s*=\s*0x([0-9a-fA-F]+)")
+        p_counter = re.compile(r"^;;;; label_counter\s*=\s*0x([0-9a-fA-F]+)")
         p_ignore = re.compile(_comment_pattern)
         nsec3_parse = rrtypes.nsec3.parser()
         for i, line in enumerate(self.f, start=1):

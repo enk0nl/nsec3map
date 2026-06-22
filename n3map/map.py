@@ -36,7 +36,7 @@ def _compute_query_interval(n, unit):
     return units[unit]/n
 
 def _query_interval(s):
-    p = re.compile('^(([0-9]\.|[1-9][0-9]*[.]?)[0-9]*)/([smh])$')
+    p = re.compile(r'^(([0-9]\.|[1-9][0-9]*[.]?)[0-9]*)/([smh])$')
     m = p.match(s)
     if m is None:
         raise ValueError
@@ -453,7 +453,7 @@ def parse_arguments(argv):
             usage(os.path.basename(argv[0]))
             sys.exit(0)
 
-        elif opt in ('-a' '--auto'):
+        elif opt in ('-a', '--auto'):
             options['zone_type'] = 'auto'
 
         elif opt in ('-n', '--nsec'):
@@ -654,7 +654,7 @@ def parse_arguments(argv):
             invalid_argument(opt, "")
 
     if options['init_db'] == True and len(args) < 1:
-        args = 'foo'
+        args = ['foo']
 
     if len(args) < 1:
         log.fatal_exit(2, 'missing arguments', "\n", "Try `",
