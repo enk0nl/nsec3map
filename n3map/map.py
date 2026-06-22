@@ -449,6 +449,9 @@ def parse_arguments(argv):
                 " --help' for more information.")
 
     for opt, arg in opts:
+        if opt.startswith('-') and not opt.startswith('--') and arg.startswith('='):
+            arg = arg[1:]
+
         if opt in ('-h', '--help'):
             usage(os.path.basename(argv[0]))
             sys.exit(0)
@@ -462,7 +465,7 @@ def parse_arguments(argv):
         elif opt in ('-3', '--nsec3'):
             options['zone_type'] = 'nsec3'
 
-        elif opt in ('--detect-only'):
+        elif opt in ('--detect-only',):
             options['detect_only'] = True
 
         elif opt in ('-4',):
@@ -654,7 +657,7 @@ def parse_arguments(argv):
             invalid_argument(opt, "")
 
     if options['init_db'] == True and len(args) < 1:
-        args = ['foo']
+        args = 'foo'
 
     if len(args) < 1:
         log.fatal_exit(2, 'missing arguments', "\n", "Try `",
