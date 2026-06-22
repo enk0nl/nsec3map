@@ -36,7 +36,7 @@ def _compute_query_interval(n, unit):
     return units[unit]/n
 
 def _query_interval(s):
-    p = re.compile('^(([0-9]\.|[1-9][0-9]*[.]?)[0-9]*)/([smh])$')
+    p = re.compile(r'^(([0-9]\.|[1-9][0-9]*[.]?)[0-9]*)/([smh])$')
     m = p.match(s)
     if m is None:
         raise ValueError
@@ -449,11 +449,14 @@ def parse_arguments(argv):
                 " --help' for more information.")
 
     for opt, arg in opts:
+        if opt.startswith('-') and not opt.startswith('--') and arg.startswith('='):
+            arg = arg[1:]
+
         if opt in ('-h', '--help'):
             usage(os.path.basename(argv[0]))
             sys.exit(0)
 
-        elif opt in ('-a' '--auto'):
+        elif opt in ('-a', '--auto'):
             options['zone_type'] = 'auto'
 
         elif opt in ('-n', '--nsec'):
@@ -462,7 +465,7 @@ def parse_arguments(argv):
         elif opt in ('-3', '--nsec3'):
             options['zone_type'] = 'nsec3'
 
-        elif opt in ('--detect-only'):
+        elif opt in ('--detect-only',):
             options['detect_only'] = True
 
         elif opt in ('-4',):
